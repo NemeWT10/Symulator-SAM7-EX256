@@ -37,6 +37,7 @@
     this.backlog = 0;
     this.speed = 1;
     this.pendingReset = false;
+    this.paused = false;
 
     // buzzer: znaczniki czasowe przełączeń PB19
     this.buzzToggles = [];
@@ -199,6 +200,7 @@
     this.lastBuzzLevel = 0;
     this.lastResetLevel = 1;
     this.pendingReset = false;
+    this.paused = false;
     if (this.cpu) this.cpu.reset();
     this.pioA.pdsrVal = this.pioA.livePdsr();
     this.pioB.pdsrVal = this.pioB.livePdsr();
@@ -207,6 +209,43 @@
 
   B.running = function () {
     return this.cpu && this.cpu.status === 'running';
+  };
+
+  /* ---------- pauza i praca krokowa ---------- */
+  B.pause = function () {
+    if (!this.running()) return;
+    this.paused = true;
+    this.onStateChange();
+  };
+  B.resume = function () {
+    this.paused = false;
+    this.rt.stepF = false;
+    this.onStateChange();
+  };
+  // wykonaj program do następnej linii źródła; zostaje w pauzie
+  B.stepLine = function () {
+    if (!this.running()) return false;
+    this.paused = true;
+    var rt = this.rt;
+    rt.stepF = true;
+    var start = rt.ln;
+    var n = 0;
+    var wall = nowMs() + 200;
+    do {
+      // spłać ewentualny "dług" paliwa (np. po Delaya) — czas wirtualny
+      // pozostaje ciągły, bo granted rośnie o tę samą wartość
+      if (rt.fuel <= 0) {
+        var need = 1 - rt.fuel;
+        this.cpu.granted += need;
+        rt.fuel += need;
+      }
+      this.cpu.slice(120);
+      n++;
+      if (this.pendingReset) { this.warn('RSTC: programowy reset płytki'); this.resetHard(); break; }
+    } while (this.cpu.status === 'running' && rt.ln === start && n < 2000 && nowMs() < wall);
+    rt.stepF = false;
+    this.onStateChange();
+    return true;
   };
 
   /* główna pętla czasu: dtMs — ile czasu rzeczywistego minęło,

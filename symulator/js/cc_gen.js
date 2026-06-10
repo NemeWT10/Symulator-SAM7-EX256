@@ -208,8 +208,71 @@
       fileNames: this.fileNames,
       mainIdx: mainSym.idx,
       fnNames: this.fnTable.map(function (f) { return f.name; }),
+      symbols: this.exportSymbols(),
       diags: this.diags
     };
+  };
+
+  /* ---------- eksport symboli (podgląd zmiennych w IDE) ---------- */
+  C.descType = function (t, depth) {
+    if (!t) return { k: '?' };
+    switch (t.k) {
+      case 'int': return { k: 'i', s: t.size, sg: !!t.sg };
+      case 'flt': return { k: 'f', s: t.size };
+      case 'ptr': return { k: 'p', s: 4 };
+      case 'arr': {
+        var n = t.n === null ? 0 : t.n;
+        if (t.of && t.of.k === 'int' && t.of.size === 1) return { k: 'cs', n: n, s: n };
+        if (depth >= 1) return { k: 'aa', n: n };
+        if (t.of && (t.of.k === 'int' || t.of.k === 'flt' || t.of.k === 'ptr')) {
+          var e = this.descType(t.of, depth + 1);
+          return { k: 'a', n: n, e: e, es: this.sizeOf(t.of, null) };
+        }
+        if (t.of && t.of.k === 'arr') {
+          var n2 = t.of.n === null ? 0 : t.of.n;
+          return { k: 'aa', n: n, n2: n2 };
+        }
+        return { k: 'aa', n: n };
+      }
+      case 'su': {
+        if (depth >= 1) return { k: '?', s: t.size || 0 };
+        var fields = [];
+        var fs = t.fields || [];
+        for (var i = 0; i < fs.length && fields.length < 8; i++) {
+          var f = fs[i];
+          if (f.type.k === 'int' || f.type.k === 'flt' || f.type.k === 'ptr') {
+            fields.push({ n: f.name, off: f.off, d: this.descType(f.type, depth + 1) });
+          }
+        }
+        return { k: 's', s: t.size || 0, fields: fields };
+      }
+    }
+    return { k: '?' };
+  };
+
+  C.exportSymbols = function () {
+    var self = this;
+    var out = [];
+    function add(name, sym, unitName) {
+      if (sym.kind !== 'var' || sym.addr === undefined) return;
+      out.push({
+        name: name,
+        unit: (sym.defUnit && sym.defUnit.name) || unitName || sym.unit || '?',
+        addr: sym.addr >>> 0,
+        size: sym.size || 0,
+        d: self.descType(sym.type, 0)
+      });
+    }
+    this.globals.forEach(function (sym, name) { add(name, sym, null); });
+    this.units.forEach(function (u) {
+      u.statics.forEach(function (sym, name) { add(name + ' [static]', sym, u.name); });
+    });
+    out.sort(function (a, b) {
+      var am = /main\.c$/i.test(a.unit) ? 0 : 1;
+      var bm = /main\.c$/i.test(b.unit) ? 0 : 1;
+      return am - bm || a.unit.localeCompare(b.unit) || a.name.localeCompare(b.name);
+    });
+    return out;
   };
 
   C.absorb = function (pp) {
@@ -1532,7 +1595,9 @@
 
   C.lnStmt = function (loc) {
     if (!loc) return '';
-    return 'RT.ln=' + (((loc.f & 0x3FF) * 0x400000) + (loc.l & 0x3FFFFF)) + ';';
+    // RT.stepF — tryb pracy krokowej: zatrzymanie po każdej instrukcji
+    return 'RT.ln=' + (((loc.f & 0x3FF) * 0x400000) + (loc.l & 0x3FFFFF)) +
+      ';if(RT.stepF)yield 0;';
   };
 
   C.genStmt = function (s, fc) {
@@ -1884,6 +1949,7 @@
     fc.lines.push(this.lnStmt(s.loc));
     fc.lines.push('for(;;){');
     fc.lines.push('if((RT.fuel-=' + cost + ')<=0)yield 0;');
+    fc.lines.push(this.lnStmt(s.loc)); // znacznik iteracji (praca krokowa)
     var c = this.rval(s.c, fc);
     fc.lines.push('if(!' + this.truthy(c) + ')break;');
     fc.loopStack.push({ breakJS: 'break', continueJS: 'continue' });
@@ -1898,6 +1964,7 @@
     fc.lines.push(this.lnStmt(s.loc));
     fc.lines.push('for(;;){');
     fc.lines.push('if((RT.fuel-=' + cost + ')<=0)yield 0;');
+    fc.lines.push(this.lnStmt(s.loc)); // znacznik iteracji (praca krokowa)
     fc.loopStack.push({ breakJS: 'break', continueJS: 'break ' + lbl });
     fc.lines.push(lbl + ':{');
     this.genStmt(s.body, fc);
@@ -1931,6 +1998,7 @@
     fc.lines.push(this.lnStmt(s.loc));
     fc.lines.push('for(;;){');
     fc.lines.push('if((RT.fuel-=' + cost + ')<=0)yield 0;');
+    fc.lines.push(this.lnStmt(s.loc)); // znacznik iteracji (praca krokowa)
     if (s.c) {
       var c = this.rval(s.c, fc);
       fc.lines.push('if(!' + this.truthy(c) + ')break;');

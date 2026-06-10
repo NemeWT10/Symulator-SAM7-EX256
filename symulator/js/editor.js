@@ -101,6 +101,7 @@
     this.hl = host.querySelector('.ed-hl');
     this.ta = host.querySelector('.ed-ta');
     this.errLines = new Set();
+    this.curLine = 0;   // aktualnie wykonywana linia (praca krokowa)
     this.lineCache = [];   // {text, stateIn, html}
     this.lineDivs = [];
 
@@ -118,6 +119,7 @@
     this.ta.value = text;
     this.ta.readOnly = !!readOnly;
     this.errLines.clear();
+    this.curLine = 0;
     this.fullRender();
     this.ta.scrollTop = 0;
     this.ta.scrollLeft = 0;
@@ -147,8 +149,11 @@
         html = r.html;
       }
       var cls = this.errLines.has(i + 1) ? ' ed-line-err' : '';
+      if (this.curLine === i + 1) cls += ' ed-line-cur';
       frag.push('<div class="ed-line' + cls + '">' + (html || '&nbsp;') + '</div>');
-      gut.push('<div class="ed-ln' + (this.errLines.has(i + 1) ? ' ed-ln-err' : '') + '">' + (i + 1) + '</div>');
+      var gcls = (this.errLines.has(i + 1) ? ' ed-ln-err' : '') +
+        (this.curLine === i + 1 ? ' ed-ln-cur' : '');
+      gut.push('<div class="ed-ln' + gcls + '">' + (i + 1) + '</div>');
     }
     this.hl.innerHTML = frag.join('');
     this.gutter.innerHTML = gut.join('');
@@ -174,6 +179,33 @@
   E.lineHeight = function () {
     var s = getComputedStyle(this.ta);
     return parseFloat(s.lineHeight) || 18;
+  };
+
+  // podświetlenie aktualnie wykonywanej linii (null = wyłącz)
+  E.setCurrentLine = function (line) {
+    var old = this.curLine;
+    this.curLine = line || 0;
+    if (old === this.curLine) return;
+    function tog(parent, idx, cls, on) {
+      var el = parent.children[idx - 1];
+      if (el) el.classList.toggle(cls, on);
+    }
+    if (old) { tog(this.hl, old, 'ed-line-cur', false); tog(this.gutter, old, 'ed-ln-cur', false); }
+    if (this.curLine) {
+      tog(this.hl, this.curLine, 'ed-line-cur', true);
+      tog(this.gutter, this.curLine, 'ed-ln-cur', true);
+    }
+  };
+
+  // przewiń tak, by linia była widoczna (bez zmiany fokusu/zaznaczenia)
+  E.revealLine = function (line) {
+    var lh = this.lineHeight();
+    var top = (line - 1) * lh;
+    var ta = this.ta;
+    if (top < ta.scrollTop + lh || top > ta.scrollTop + ta.clientHeight - 2 * lh) {
+      ta.scrollTop = Math.max(0, top - ta.clientHeight / 2);
+      ta.dispatchEvent(new Event('scroll'));
+    }
   };
 
   E.onKey = function (e) {

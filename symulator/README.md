@@ -36,7 +36,13 @@ i otworzyć `http://localhost:8000`.
    kod w `main.c`.
 2. Kliknij **▶ Uruchom** (klawisz F5). Błędy kompilacji pojawią się w konsoli —
    kliknięcie błędu otwiera plik i podświetla linię.
-3. Steruj płytką:
+3. **Debugowanie:** ⏸ **Pauza** (F7) wstrzymuje program, ⏭ **Krok** (F8)
+   wykonuje go do następnej linii — aktualna linia podświetla się w edytorze
+   (krokowanie wchodzi też do funkcji, np. do sterownika LCD). Zakładka
+   **ZMIENNE** pod edytorem pokazuje na żywo wartości zmiennych globalnych
+   programu (w tym pola struktur i wskaźniki — widać np. powiązania listy
+   dwukierunkowej menu z lab 10) wraz z adresami w pamięci.
+4. Steruj płytką:
 
    | Element płytki | Pin | Klawiatura |
    |---|---|---|
@@ -51,7 +57,7 @@ i otworzyć `http://localhost:8000`.
    | buzzer (AUDIO_OUT) | PB19 | — (ikona + dźwięk) |
 
    Klawiatura działa, gdy kursor jest **poza** edytorem (kliknij w obszar płytki).
-4. Projekt zapisuje się automatycznie w przeglądarce (localStorage).
+5. Projekt zapisuje się automatycznie w przeglądarce (localStorage).
    **Eksport ZIP** pobiera pliki — można je przenieść do CrossWorks na zajęciach.
    **Import plików** dodaje pliki `.c`/`.h` z dysku (obsługuje kodowanie CP1250).
 

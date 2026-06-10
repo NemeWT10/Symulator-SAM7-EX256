@@ -17,6 +17,8 @@
   <div class="tb-group">
     <button id="btnRun" class="tb-btn tb-run" title="Kompiluj i uruchom (F5)">▶ Uruchom</button>
     <button id="btnReset" class="tb-btn" title="Reset płytki — program od początku (F6)">⟲ Reset</button>
+    <button id="btnPause" class="tb-btn" title="Wstrzymaj / wznów wykonywanie (F7)">⏸ Pauza</button>
+    <button id="btnStep" class="tb-btn" title="Wykonaj do następnej linii kodu (F8)">⏭ Krok</button>
     <button id="btnStop" class="tb-btn" title="Zatrzymaj wykonywanie">⏹ Stop</button>
     <label class="tb-lbl">Prędkość
       <select id="selSpeed">
@@ -57,12 +59,22 @@
     <div id="editorHost"></div>
     <div id="consolePane">
       <div class="pane-head">
-        <span>KONSOLA</span>
+        <span class="con-tabs">
+          <button id="tabCon" class="con-tab active">KONSOLA</button>
+          <button id="tabWatch" class="con-tab">ZMIENNE</button>
+        </span>
         <span class="pane-actions">
           <button id="btnClearCon" title="Wyczyść konsolę">✕</button>
         </span>
       </div>
       <div id="consoleOut"></div>
+      <div id="watchPane" class="hidden">
+        <div class="watch-bar">
+          <input id="watchFilter" type="text" placeholder="filtruj zmienne…" spellcheck="false">
+          <span id="watchInfo" class="watch-info"></span>
+        </div>
+        <div id="watchOut"></div>
+      </div>
     </div>
   </section>
 
@@ -125,6 +137,10 @@
         <li>Wybierz przykład z listy <i>Przykłady</i> (np. „Lab 10 — menu”) albo pisz własny kod w <code>main.c</code>.</li>
         <li>Kliknij <b>▶ Uruchom</b> (F5). Błędy kompilacji pojawią się w konsoli — kliknij błąd, by przejść do linii.</li>
         <li>Steruj płytką: joystick (strzałki / Enter), przyciski SW1, SW2 (klawisze 1, 2).</li>
+        <li><b>⏸ Pauza (F7)</b> wstrzymuje program, <b>⏭ Krok (F8)</b> wykonuje go
+          do następnej linii (aktualna linia podświetla się w edytorze).
+          Zakładka <b>ZMIENNE</b> pod edytorem pokazuje na żywo wartości
+          zmiennych globalnych programu (z adresami w pamięci).</li>
       </ol>
       <p><b>Uwaga:</b> wbudowane przykłady są <b>poglądowe</b> — ilustrują techniki
         z instrukcji, ale nie są kompletnymi rozwiązaniami zadań zaliczeniowych

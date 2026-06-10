@@ -139,6 +139,11 @@
       editor.ta.scrollTop = st.scrollTop || 0;
       editor.ta.dispatchEvent(new Event('scroll'));
     }
+    // jeśli program stoi w pauzie w tym pliku — pokaż bieżącą linię
+    if (board.paused && board.cpu) {
+      var li = board.cpu.lnInfo();
+      if (li.file === fname) editor.setCurrentLine(li.line);
+    }
     renderTabs();
     renderTree();
   }
@@ -223,6 +228,185 @@
     while (out.children.length > 600) out.removeChild(out.firstChild);
   }
 
+  /* ---------------- panel ZMIENNE (watch) ---------------- */
+  var watchSyms = [];        // symbole z kompilacji
+  var watchRows = [];        // {sym, valEl, last}
+  var watchVisible = false;
+
+  function fmtHexAddr(a) { return '0x' + (a >>> 0).toString(16).toUpperCase().padStart(8, '0'); }
+
+  function readScalar(d, addr) {
+    var off = addr - CC.MEM_BASE;
+    var dv = board.rt.dv;
+    if (off < 0 || off + 8 > dv.byteLength) return null;
+    switch (d.k) {
+      case 'i':
+        if (d.s === 1) return d.sg ? dv.getInt8(off) : dv.getUint8(off);
+        if (d.s === 2) return d.sg ? dv.getInt16(off, true) : dv.getUint16(off, true);
+        return d.sg ? dv.getInt32(off, true) : dv.getUint32(off, true);
+      case 'f':
+        return d.s === 4 ? dv.getFloat32(off, true) : dv.getFloat64(off, true);
+      case 'p':
+        return dv.getUint32(off, true);
+    }
+    return null;
+  }
+
+  function fmtScalar(d, addr) {
+    var v = readScalar(d, addr);
+    if (v === null) return '?';
+    if (d.k === 'p') return v === 0 ? 'NULL' : fmtHexAddr(v);
+    if (d.k === 'f') {
+      var s = (Math.abs(v) >= 1e6 || (Math.abs(v) < 1e-4 && v !== 0)) ?
+        v.toExponential(4) : String(Math.round(v * 1e6) / 1e6);
+      return s;
+    }
+    // int
+    if (d.s === 1 && v >= 32 && v < 127) return v + " '" + String.fromCharCode(v) + "'";
+    if (!d.sg && v > 255) return v + ' (0x' + (v >>> 0).toString(16).toUpperCase() + ')';
+    return String(v);
+  }
+
+  function fmtValue(sym) {
+    var d = sym.d, addr = sym.addr;
+    switch (d.k) {
+      case 'i': case 'f': case 'p':
+        return fmtScalar(d, addr);
+      case 'cs': {
+        if (d.n > 64) return '[tablica ' + d.n + ' B]';
+        var s = '', off = addr - CC.MEM_BASE;
+        for (var i = 0; i < Math.min(d.n, 32); i++) {
+          var b = board.rt.u8[off + i];
+          if (b === 0) break;
+          s += (b >= 32 && b < 127) ? String.fromCharCode(b) : '\\x' + b.toString(16).padStart(2, '0');
+        }
+        return '"' + s + '"';
+      }
+      case 'a': {
+        var n = Math.min(d.n, 8);
+        var parts = [];
+        for (var j = 0; j < n; j++) parts.push(fmtScalar(d.e, addr + j * d.es));
+        return '[' + parts.join(', ') + (d.n > 8 ? ', … ×' + d.n : '') + ']';
+      }
+      case 'aa':
+        return '[tablica' + (d.n ? ' ' + d.n + (d.n2 ? '×' + d.n2 : '') : '') + ']';
+      case 's': {
+        if (!d.fields || !d.fields.length) return '{…} (' + d.s + ' B)';
+        var ps = d.fields.map(function (f) {
+          return f.n + '=' + fmtScalar(f.d, addr + f.off);
+        });
+        return '{' + ps.join(', ') + '}';
+      }
+    }
+    return '?';
+  }
+
+  function renderWatchList() {
+    var out = $('watchOut');
+    out.innerHTML = '';
+    watchRows = [];
+    var filter = ($('watchFilter').value || '').toLowerCase();
+    var shown = 0;
+    watchSyms.forEach(function (sym) {
+      if (filter && sym.name.toLowerCase().indexOf(filter) < 0 &&
+        sym.unit.toLowerCase().indexOf(filter) < 0) return;
+      if (shown >= 400) return;
+      shown++;
+      var row = document.createElement('div');
+      row.className = 'w-row';
+      var isMain = /main\.c$/i.test(sym.unit);
+      row.innerHTML =
+        '<span class="w-name"></span>' +
+        '<span class="w-val"></span>' +
+        '<span class="w-addr">' + fmtHexAddr(sym.addr) + ' · ' + sym.size + ' B</span>';
+      var nm = row.querySelector('.w-name');
+      nm.textContent = sym.name;
+      if (!isMain) {
+        var u = document.createElement('span');
+        u.className = 'w-unit';
+        u.textContent = sym.unit;
+        nm.appendChild(u);
+      }
+      nm.title = sym.unit;
+      out.appendChild(row);
+      watchRows.push({ sym: sym, valEl: row.querySelector('.w-val'), last: null });
+    });
+    $('watchInfo').textContent = shown + ' / ' + watchSyms.length;
+    $('tabWatch').textContent = 'ZMIENNE (' + watchSyms.length + ')';
+    refreshWatch(true);
+  }
+
+  function refreshWatch(force) {
+    if (!watchVisible && !force) return;
+    if (!board.cpu) return;
+    for (var i = 0; i < watchRows.length; i++) {
+      var r = watchRows[i];
+      var v = fmtValue(r.sym);
+      if (v !== r.last) {
+        r.valEl.textContent = v;
+        r.valEl.classList.toggle('w-chg', r.last !== null);
+        r.last = v;
+      } else {
+        r.valEl.classList.remove('w-chg');
+      }
+    }
+  }
+
+  function showConsoleTab(watch) {
+    watchVisible = !!watch;
+    $('consoleOut').classList.toggle('hidden', watchVisible);
+    $('watchPane').classList.toggle('hidden', !watchVisible);
+    $('tabCon').classList.toggle('active', !watchVisible);
+    $('tabWatch').classList.toggle('active', watchVisible);
+    if (watchVisible) refreshWatch(true);
+  }
+
+  /* ---------------- pauza / praca krokowa ---------------- */
+  function showCurrentLine() {
+    if (!board.cpu) return;
+    var li = board.cpu.lnInfo();
+    if (li.file && li.line && project.files[li.file] !== undefined) {
+      if (activeFile !== li.file) openFile(li.file);
+      editor.setCurrentLine(li.line);
+      editor.revealLine(li.line);
+    } else {
+      editor.setCurrentLine(null);
+    }
+  }
+  function clearCurrentLine() {
+    editor.setCurrentLine(null);
+  }
+
+  function doPauseResume() {
+    if (!board.running()) return;
+    if (board.paused) {
+      board.resume();
+      clearCurrentLine();
+      conLine('sys', 'Wznowiono.');
+    } else {
+      board.pause();
+      var li = board.cpu.lnInfo();
+      conLine('sys', 'Wstrzymano w ' + li.file + ':' + li.line + ' (t = ' + board.timeSec().toFixed(3) + ' s). F8 — krok, F7 — wznów.');
+      showCurrentLine();
+      refreshWatch(true);
+    }
+    updateStatus();
+  }
+
+  function doStep() {
+    if (!board.running()) { conLine('warn', 'Program nie działa — najpierw ▶ Uruchom.'); return; }
+    if (!board.paused) {
+      board.pause();
+      conLine('sys', 'Wstrzymano (F8 — kolejne kroki, F7 — wznów).');
+    } else {
+      board.stepLine();
+    }
+    showCurrentLine();
+    refreshWatch(true);
+    repaintLcd(true);
+    updateStatus();
+  }
+
   /* ---------------- kompilacja / uruchamianie ---------------- */
   function collectFiles() {
     persistCurrentEdit();
@@ -266,6 +450,9 @@
     conLine('sys', 'Kompilacja OK (' + ms + ' ms' + (warns ? ', ostrzeżeń: ' + warns : '') + '). Uruchamiam…');
     board.load(res.result);
     compiledOk = true;
+    watchSyms = res.result.symbols || [];
+    renderWatchList();
+    clearCurrentLine();
     ensureAudio();
     updateStatus();
   }
@@ -273,12 +460,15 @@
   function doReset() {
     if (!compiledOk) { conLine('warn', 'Najpierw uruchom program (▶).'); return; }
     board.resetHard();
+    clearCurrentLine();
     conLine('sys', 'Reset płytki — program od początku.');
     updateStatus();
   }
   function doStop() {
     if (board.cpu && board.cpu.status === 'running') {
       board.cpu.status = 'stopped';
+      board.paused = false;
+      clearCurrentLine();
       conLine('sys', 'Zatrzymano wykonywanie.');
       updateStatus();
     }
@@ -321,6 +511,8 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'F5') { e.preventDefault(); doRun(); return; }
       if (e.key === 'F6') { e.preventDefault(); doReset(); return; }
+      if (e.key === 'F7') { e.preventDefault(); doPauseResume(); return; }
+      if (e.key === 'F8') { e.preventDefault(); doStep(); return; }
       if (isEditableTarget(e)) return;
       var k = KEYMAP[e.key];
       if (k) {
@@ -365,7 +557,7 @@
     $('buzzIcon').textContent = st.active ? '🔊' : '🔈';
     if (audio.ctx) {
       var muted = $('chkMute').checked;
-      var want = (st.active && !muted && board.running()) ? 0.045 : 0;
+      var want = (st.active && !muted && board.running() && !board.paused) ? 0.045 : 0;
       audio.gain.gain.setTargetAtTime(want, audio.ctx.currentTime, 0.02);
       if (st.active && st.freq > 20) {
         var f = Math.min(Math.max(st.freq, 40), 9000);
@@ -386,8 +578,14 @@
       stopped: ['ZATRZYMANY', 'st-idle']
     };
     var m = map[st] || map.idle;
+    if (st === 'running' && board.paused) {
+      var li = board.cpu.lnInfo();
+      m = ['PAUZA ' + (li.file ? li.file.replace(/^.*[\\/]/, '') + ':' + li.line : ''), 'st-paused'];
+    }
     el.textContent = m[0];
     el.className = m[1];
+    var bp = $('btnPause');
+    if (bp) bp.textContent = (board.paused && st === 'running') ? '▶ Wznów' : '⏸ Pauza';
     $('ledPwr').classList.toggle('on', !!board.cpu);
     $('ledBl').classList.toggle('on', board.backlightOn());
   }
@@ -396,12 +594,12 @@
    * setInterval zamiast czystego rAF — działa też, gdy karta
    * jest w tle (rAF bywa wstrzymywany). rAF służy do płynnego
    * odmalowywania, gdy jest dostępny. */
-  var lastT = 0, statT = 0;
+  var lastT = 0, statT = 0, watchT = 0;
   function pump() {
     var t = performance.now();
     var dt = lastT ? Math.min(t - lastT, 100) : 16;
     lastT = t;
-    if (board.cpu && board.cpu.status === 'running') {
+    if (board.cpu && board.cpu.status === 'running' && !board.paused) {
       board.tick(dt, 9);
     }
     repaintLcd(false);
@@ -410,6 +608,10 @@
       $('stTime').textContent = 't = ' + board.timeSec().toFixed(2) + ' s';
       updateStatus();
       updateBuzzer();
+    }
+    if (t - watchT > 300) {
+      watchT = t;
+      refreshWatch(false);
     }
   }
   function startLoop() {
@@ -609,6 +811,11 @@
     $('btnRun').addEventListener('click', doRun);
     $('btnReset').addEventListener('click', doReset);
     $('btnStop').addEventListener('click', doStop);
+    $('btnPause').addEventListener('click', doPauseResume);
+    $('btnStep').addEventListener('click', doStep);
+    $('tabCon').addEventListener('click', function () { showConsoleTab(false); });
+    $('tabWatch').addEventListener('click', function () { showConsoleTab(true); });
+    $('watchFilter').addEventListener('input', renderWatchList);
     $('btnNewFile').addEventListener('click', newFile);
     $('btnNewProj').addEventListener('click', newProject);
     $('btnImport').addEventListener('click', importFiles);
@@ -646,6 +853,8 @@
     board: board,
     run: function () { doRun(); },
     press: function (k, on) { board.setInput(k, on); },
+    pause: function () { doPauseResume(); },
+    step: function () { doStep(); },
     state: function () {
       return {
         status: board.cpu ? board.cpu.status : 'idle',

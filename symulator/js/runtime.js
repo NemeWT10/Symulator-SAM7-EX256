@@ -25,6 +25,7 @@
     this.u8 = new Uint8Array(this.buf);
     this.fuel = 0;
     this.ln = 0;
+    this.stepF = false;   // tryb krokowy: yield po każdej instrukcji
     this.sp = MEM_BASE + MEM_SIZE;
     this.stackLimit = MEM_BASE + MEM_SIZE - STACK_SIZE;
     this.heapPtr = 0;
@@ -403,6 +404,7 @@
     rt.heapEnd = Math.min(this.compiled.heapBase + 0x100000, rt.stackLimit);
     rt.fuel = 0;
     rt.ln = 0;
+    rt.stepF = false;
     rt.irqEnabled = true;
     this.granted = 0;
     this.irqGen = null;
