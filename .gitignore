@@ -1,0 +1,12 @@
+# lokalne śmieci / pliki robocze
+_tmp/
+.claude/
+symulator/tools/out/
+Thumbs.db
+*.bak
+
+# Materiały laboratoryjne (instrukcje PDF — prawa autorskie PL / dr inż.
+# W. Surtel, oryginalne projekty, cliparty, artefakty kompilacji CrossWorks).
+# Repozytorium jest samowystarczalne: potrzebne pliki źródłowe sterownika LCD
+# są w symulator/tools/lab_src/, a bitmapy generuje build_projfiles.js.
+projekty_ktore_maja_dzialac/

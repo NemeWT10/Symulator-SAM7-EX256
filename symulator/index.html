@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Symulator SAM7-EX256 — Laboratorium systemów wbudowanych</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23a32222'/><rect x='3' y='3' width='10' height='10' rx='1' fill='%2366ddff'/></svg>">
+</head>
+<body>
+
+<header id="toolbar">
+  <div class="brand">
+    <span class="brand-chip">SAM7-EX256</span>
+    <span class="brand-sub">symulator — IIS&nbsp;5.3 lab&nbsp;6–10</span>
+  </div>
+  <div class="tb-group">
+    <button id="btnRun" class="tb-btn tb-run" title="Kompiluj i uruchom (F5)">▶ Uruchom</button>
+    <button id="btnReset" class="tb-btn" title="Reset płytki — program od początku (F6)">⟲ Reset</button>
+    <button id="btnStop" class="tb-btn" title="Zatrzymaj wykonywanie">⏹ Stop</button>
+    <label class="tb-lbl">Prędkość
+      <select id="selSpeed">
+        <option value="0.1">0.1×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1× (czas rzeczywisty)</option>
+        <option value="3">3×</option>
+        <option value="10">10×</option>
+        <option value="1000">maks.</option>
+      </select>
+    </label>
+  </div>
+  <div class="tb-group tb-right">
+    <label class="tb-lbl">Przykłady
+      <select id="selExample"><option value="">— wybierz —</option></select>
+    </label>
+    <button id="btnNewProj" class="tb-btn" title="Nowy, pusty projekt">Nowy projekt</button>
+    <button id="btnImport" class="tb-btn" title="Dodaj pliki z dysku do projektu">Import plików</button>
+    <button id="btnExport" class="tb-btn" title="Pobierz projekt jako ZIP">Eksport ZIP</button>
+    <button id="btnHelp" class="tb-btn" title="Pomoc">?</button>
+  </div>
+</header>
+
+<main id="layout">
+  <aside id="filePane">
+    <div class="pane-head">
+      <span>PLIKI PROJEKTU</span>
+      <span class="pane-actions">
+        <button id="btnNewFile" title="Nowy plik">＋</button>
+      </span>
+    </div>
+    <ul id="fileTree"></ul>
+    <div class="pane-foot" id="projInfo"></div>
+  </aside>
+
+  <section id="editorPane">
+    <div id="tabs"></div>
+    <div id="editorHost"></div>
+    <div id="consolePane">
+      <div class="pane-head">
+        <span>KONSOLA</span>
+        <span class="pane-actions">
+          <button id="btnClearCon" title="Wyczyść konsolę">✕</button>
+        </span>
+      </div>
+      <div id="consoleOut"></div>
+    </div>
+  </section>
+
+  <aside id="boardPane">
+    <div id="pcb">
+      <div class="pcb-head">
+        <span class="pcb-name">OLIMEX&nbsp;SAM7-EX256</span>
+        <span class="led-box"><i id="ledPwr" class="led led-grn"></i>PWR</span>
+        <span class="led-box"><i id="ledBl" class="led led-yel"></i>BL</span>
+      </div>
+
+      <div id="lcdBezel">
+        <canvas id="lcd" width="132" height="132"></canvas>
+      </div>
+
+      <div class="pcb-mid">
+        <div id="joy">
+          <button class="joy-btn joy-up"    data-key="UP"    title="Joystick — góra (↑)">▲</button>
+          <button class="joy-btn joy-left"  data-key="LEFT"  title="Joystick — lewo (←)">◀</button>
+          <button class="joy-btn joy-enter" data-key="ENTER" title="Joystick — wciśnięcie (Enter)">●</button>
+          <button class="joy-btn joy-right" data-key="RIGHT" title="Joystick — prawo (→)">▶</button>
+          <button class="joy-btn joy-down"  data-key="DOWN"  title="Joystick — dół (↓)">▼</button>
+        </div>
+        <div class="sw-col">
+          <button id="swRst" class="sw-btn sw-rst" title="RESET płytki">RST</button>
+          <button class="sw-btn" data-key="SW1" title="Przycisk SW1 (klawisz 1)">SW1</button>
+          <button class="sw-btn" data-key="SW2" title="Przycisk SW2 (klawisz 2)">SW2</button>
+          <div id="buzzBox" title="Buzzer (PB19)">
+            <span id="buzzIcon">🔈</span>
+            <label class="mute-lbl"><input type="checkbox" id="chkMute">wycisz</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="pcb-extra">
+        <label class="trim-lbl">Potencjometr (ADC):
+          <input type="range" id="trimPot" min="0" max="1023" value="512">
+          <span id="trimVal">512</span>
+        </label>
+      </div>
+
+      <div id="boardStatus">
+        <span id="stState" class="st-idle">—</span>
+        <span id="stTime">t = 0.00 s</span>
+        <button id="btnShot" class="shot-btn" title="Zapisz zrzut ekranu LCD do pliku PNG (do sprawozdania)">📷 zrzut</button>
+      </div>
+      <div class="hint">klawiatura: ←↑↓→ + Enter = joystick, 1/2 = SW1/SW2 (gdy kursor poza edytorem)</div>
+    </div>
+  </aside>
+</main>
+
+<div id="helpModal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Symulator SAM7-EX256 — pomoc</h2>
+    <div class="modal-body">
+      <p>Symulator płytki <b>Olimex SAM7-EX256</b> (AT91SAM7X256, ARM7TDMI) do ćwiczeń
+        z instrukcji „IIS 5.3 Laboratorium systemów wbudowanych” (lab&nbsp;6–10) oraz instrukcji LSW6 (timery).</p>
+      <h3>Jak zacząć</h3>
+      <ol>
+        <li>Wybierz przykład z listy <i>Przykłady</i> (np. „Lab 10 — menu”) albo pisz własny kod w <code>main.c</code>.</li>
+        <li>Kliknij <b>▶ Uruchom</b> (F5). Błędy kompilacji pojawią się w konsoli — kliknij błąd, by przejść do linii.</li>
+        <li>Steruj płytką: joystick (strzałki / Enter), przyciski SW1, SW2 (klawisze 1, 2).</li>
+      </ol>
+      <p><b>Uwaga:</b> wbudowane przykłady są <b>poglądowe</b> — ilustrują techniki
+        z instrukcji, ale nie są kompletnymi rozwiązaniami zadań zaliczeniowych
+        (prowadzący wymaga więcej, niż pokazują).</p>
+      <h3>Co jest symulowane</h3>
+      <ul>
+        <li>porty PIOA/PIOB (PER, OER, ODR, SODR, CODR, PDSR, pull-upy, przerwania zmiany stanu),</li>
+        <li>PMC (PCER/PCDR/PCSR — pamiętaj o włączeniu zegara portu!),</li>
+        <li>SPI0 + kontroler LCD Philips PCF8833 (Nokia 6610, 132×132, 12 bpp, komendy PASET/CASET/RAMWR…),</li>
+        <li>timer PIT (PIT_MR, PIT_SR, PIT_PIVR, PIT_PIIR) i liczniki TC0–TC2 (tryb przepełnienia i RC compare),</li>
+        <li>AIC (wektory SVR, IECR…) — przerwania PIT/TC/PIO,</li>
+        <li>podświetlenie LCD (PB20), buzzer (PB19, z dźwiękiem), przyciski SW1=PB24, SW2=PB25,
+            joystick: góra=PA9, dół=PA8, lewo=PA7, prawo=PA14, enter=PA15,</li>
+        <li><code>debug_printf()</code> i <code>printf()</code> piszą do konsoli symulatora.</li>
+      </ul>
+      <h3>Pliki i projekty</h3>
+      <p>Projekt zawiera <code>main.c</code> oraz biblioteki z laboratorium
+        (<code>pcf8833u8_lcd.c/h</code>, <code>fonts.h</code>, <code>bmp*.h</code>) — możesz je modyfikować
+        (lab&nbsp;9 wymaga zmian w sterowniku LCD). Projekt zapisuje się automatycznie w przeglądarce.
+        <i>Eksport ZIP</i> pobiera pliki, które można wkleić do CrossWorks na zajęciach.</p>
+      <p class="dim">MCK = 48 MHz. Czas wirtualny płynie zgodnie z wybraną prędkością;
+        pętle opóźniające (np. <code>Delaya()</code>) trwają tyle, co na prawdziwej płytce.</p>
+    </div>
+    <button id="btnCloseHelp" class="tb-btn">Zamknij</button>
+  </div>
+</div>
+
+<script src="js/cc_lex.js"></script>
+<script src="js/cc_parse.js"></script>
+<script src="js/cc_gen.js"></script>
+<script src="js/runtime.js"></script>
+<script src="js/periph.js"></script>
+<script src="js/lcd.js"></script>
+<script src="js/board.js"></script>
+<script src="js/headers.js"></script>
+<script src="js/projfiles.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/ide.js"></script>
+</body>
+</html>
