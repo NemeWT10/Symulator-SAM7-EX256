@@ -117,20 +117,35 @@ aside, section { min-width: 0; min-height: 0; }
 
 #editorHost { flex: 1; min-height: 0; }
 .ed-wrap { display: flex; height: 100%; font-family: var(--mono); font-size: 13px; line-height: 19px; }
+/* Numery wierszy i warstwa podświetlania są pozycjonowane absolutnie
+   (top = padding + nr_linii × line-height) — dokładnie ta sama arytmetyka,
+   której używa textarea do układania linii tekstu. Dzięki temu przy
+   skalowaniu systemowym Windows (125/150%) i zoomie przeglądarki nic się
+   nie rozjeżdża (wcześniej sub-pikselowe zaokrąglanie wysokości kolejnych
+   elementów kumulowało się i po ~40 liniach numeracja była przesunięta). */
 .ed-gutter {
-  flex: 0 0 48px; overflow: hidden; text-align: right;
-  padding: 6px 8px 6px 0; color: #555b73; background: #1b1d22;
+  flex: 0 0 48px; overflow: hidden; position: relative;
+  color: #555b73; background: #1b1d22;
   border-right: 1px solid var(--border); user-select: none;
 }
-.ed-ln { height: 19px; }
+.ed-gutter-in {
+  position: absolute; top: 0; left: 0; width: 100%;
+  will-change: transform;
+}
+.ed-ln {
+  position: absolute; left: 0; right: 8px; height: 19px;
+  text-align: right; white-space: nowrap;
+}
 .ed-ln-err { color: var(--red); font-weight: 700; }
 .ed-scroller { position: relative; flex: 1; overflow: hidden; }
 .ed-hl {
-  position: absolute; top: 0; left: 0; padding: 6px 8px;
-  pointer-events: none; white-space: pre; will-change: transform;
-  min-width: 100%;
+  position: absolute; top: 0; left: 0;
+  pointer-events: none; will-change: transform;
 }
-.ed-line { height: 19px; }
+.ed-line {
+  position: absolute; left: 8px; width: 4000px; height: 19px;
+  white-space: pre;
+}
 .ed-line-err { background: rgba(255, 80, 80, .12); box-shadow: inset 2px 0 0 var(--red); }
 .ed-line-cur { background: rgba(255, 210, 80, .16); box-shadow: inset 3px 0 0 var(--yellow); }
 .ed-ln-cur { color: var(--yellow); font-weight: 700; }

@@ -91,12 +91,14 @@
     this.host = host;
     host.classList.add('ed-wrap');
     host.innerHTML =
-      '<div class="ed-gutter"></div>' +
+      '<div class="ed-gutter"><div class="ed-gutter-in"></div></div>' +
       '<div class="ed-scroller">' +
       '  <div class="ed-hl" aria-hidden="true"></div>' +
       '  <textarea class="ed-ta" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>' +
       '</div>';
-    this.gutter = host.querySelector('.ed-gutter');
+    // przewijany (transform) jest element WEWNĘTRZNY, a przycina zewnętrzny —
+    // inaczej overflow:hidden obcina numery spoza pierwszego ekranu
+    this.gutter = host.querySelector('.ed-gutter-in');
     this.scroller = host.querySelector('.ed-scroller');
     this.hl = host.querySelector('.ed-hl');
     this.ta = host.querySelector('.ed-ta');
@@ -139,6 +141,10 @@
     var gut = [];
     var huge = lines.length > 4000; // bardzo duże pliki (bmp.h): bez kolorowania
     var state = { inComment: false };
+    // ta sama arytmetyka, której używa textarea: top = padding + i × line-height
+    var st = getComputedStyle(this.ta);
+    var lh = parseFloat(st.lineHeight) || 19;
+    var padTop = parseFloat(st.paddingTop) || 6;
     for (var i = 0; i < lines.length; i++) {
       var html;
       if (huge) {
@@ -148,12 +154,13 @@
         state = r.state;
         html = r.html;
       }
+      var top = ' style="top:' + (padTop + i * lh) + 'px"';
       var cls = this.errLines.has(i + 1) ? ' ed-line-err' : '';
       if (this.curLine === i + 1) cls += ' ed-line-cur';
-      frag.push('<div class="ed-line' + cls + '">' + (html || '&nbsp;') + '</div>');
+      frag.push('<div class="ed-line' + cls + '"' + top + '>' + (html || '&nbsp;') + '</div>');
       var gcls = (this.errLines.has(i + 1) ? ' ed-ln-err' : '') +
         (this.curLine === i + 1 ? ' ed-ln-cur' : '');
-      gut.push('<div class="ed-ln' + gcls + '">' + (i + 1) + '</div>');
+      gut.push('<div class="ed-ln' + gcls + '"' + top + '>' + (i + 1) + '</div>');
     }
     this.hl.innerHTML = frag.join('');
     this.gutter.innerHTML = gut.join('');
