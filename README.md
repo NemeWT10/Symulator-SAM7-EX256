@@ -12,4 +12,4 @@ Pełny opis projektu: [symulator/README.md](symulator/README.md).
 
 Przydatne kody :)
 
-https://github.com/NemeWT10/systemyWbudowane_ARM7_laboratoria
+https://github.com/NemeWT10/systemyWbudowane_SAM7_laboratoria
