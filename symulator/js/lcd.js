@@ -135,9 +135,10 @@
             this.bitAcc &= (1 << this.bitCnt) - 1;
             if (pxBits === 12) {
               this.putPixel(v & 0xFFF);
-            } else { // RGB565 — konwersja przybliżona
-              var r = (v >> 12) & 0xF, gg = (v >> 7) & 0xF, bl = (v >> 1) & 0xF;
-              this.putPixel(((bl << 8) | (gg << 4) | r) & 0xFFF);
+            } else { // RGB565 → 12 bitów; kolejność pól zostaje bez zmian,
+              // bo o zamianie R↔B decyduje bit BGR w MADCTL — tak samo jak przy 12 bpp
+              var f2 = (v >> 12) & 0xF, f1 = (v >> 7) & 0xF, f0 = (v >> 1) & 0xF;
+              this.putPixel(((f2 << 8) | (f1 << 4) | f0) & 0xFFF);
             }
           }
         }

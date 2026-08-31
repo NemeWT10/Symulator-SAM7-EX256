@@ -7,6 +7,7 @@
   'use strict';
   var CC = g.CC;
   var LS_KEY = 'sam7sim_project_v1';
+  var LS_PENDING = 'sam7sim_pending_files_v1';
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -83,16 +84,33 @@
       var isC = /\.c$/i.test(fname);
       li.innerHTML = '<span class="fi-ico ' + (isC ? 'fi-c' : 'fi-h') + '">' + (isC ? 'C' : 'H') + '</span>' +
         '<span class="fi-name"></span>' +
+        '<span class="fi-act fi-dl" title="Pobierz ten plik na dysk">⤓</span>' +
         '<span class="fi-act fi-ren" title="Zmień nazwę">✎</span>' +
         '<span class="fi-act fi-del" title="Usuń plik">🗑</span>';
       li.querySelector('.fi-name').textContent = fname;
       li.addEventListener('click', function (e) {
+        if (e.target.classList.contains('fi-dl')) { downloadFile(fname); return; }
         if (e.target.classList.contains('fi-del')) { delFile(fname); return; }
         if (e.target.classList.contains('fi-ren')) { renameFile(fname); return; }
         openFile(fname);
       });
       ul.appendChild(li);
     });
+  }
+
+  /* pojedynczy plik na dysk — CRLF, bo pliki lądują zwykle w CrossWorks na Windows */
+  function downloadFile(fname) {
+    persistCurrentEdit();
+    var text = project.files[fname];
+    if (text === undefined) return;
+    var blob = new Blob([text.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n')],
+      { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    conLine('sys', 'Pobrano plik: ' + fname);
   }
 
   function delFile(fname) {
@@ -686,6 +704,30 @@
     inp.click();
   }
 
+  /* Pliki .h przysłane z konwertera grafiki (bmp.html) — leżą w osobnym
+   * kluczu, żeby konwerter nie nadpisał całego projektu, gdy IDE jest
+   * otwarte w drugiej karcie. Odbieramy przy starcie i po powrocie do karty. */
+  function drainPending() {
+    var q;
+    try {
+      q = JSON.parse(localStorage.getItem(LS_PENDING) || '[]');
+    } catch (e) { q = []; }
+    if (!q.length) return;
+    try { localStorage.removeItem(LS_PENDING); } catch (e) { }
+    var added = [];
+    q.forEach(function (f) {
+      if (!f || !f.name || typeof f.text !== 'string') return;
+      if (project.files[f.name] !== undefined &&
+        !confirm('Konwerter grafiki przysłał plik ' + f.name + ', który już istnieje. Nadpisać?')) return;
+      project.files[f.name] = f.text;
+      added.push(f.name);
+    });
+    if (!added.length) return;
+    renderTree(); saveProject();
+    conLine('sys', 'Z konwertera grafiki: ' + added.join(', '));
+    openFile(added[0]);
+  }
+
   // ZIP bez kompresji (metoda store)
   function crc32(u8) {
     var tbl = crc32.t;
@@ -804,6 +846,11 @@
     renderTree();
     openFile(project.files['main.c'] !== undefined ? 'main.c' : Object.keys(project.files)[0]);
     updateProjInfo();
+    drainPending();
+    window.addEventListener('focus', drainPending);
+    window.addEventListener('storage', function (e) {
+      if (e.key === LS_PENDING && e.newValue) drainPending();
+    });
 
     board.onConsole = function (kind, text, file, line) { conLine(kind, text, file, line); };
     board.onStateChange = updateStatus;

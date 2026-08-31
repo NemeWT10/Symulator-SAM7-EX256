@@ -38,6 +38,8 @@
     <button id="btnNewProj" class="tb-btn" title="Nowy, pusty projekt">Nowy projekt</button>
     <button id="btnImport" class="tb-btn" title="Dodaj pliki z dysku do projektu">Import plików</button>
     <button id="btnExport" class="tb-btn" title="Pobierz projekt jako ZIP">Eksport ZIP</button>
+    <a id="btnBmp" class="tb-btn tb-bmp" href="bmp.html"
+       title="Zamień JPG/PNG na tablicę C (.h) dla LCDDrawBmp12()">🖼 Grafika → .h</a>
     <button id="btnHelp" class="tb-btn" title="Pomoc">?</button>
   </div>
 </header>
@@ -160,7 +162,16 @@
       <p>Projekt zawiera <code>main.c</code> oraz biblioteki z laboratorium
         (<code>pcf8833u8_lcd.c/h</code>, <code>fonts.h</code>, <code>bmp*.h</code>) — możesz je modyfikować
         (lab&nbsp;9 wymaga zmian w sterowniku LCD). Projekt zapisuje się automatycznie w przeglądarce.
-        <i>Eksport ZIP</i> pobiera pliki, które można wkleić do CrossWorks na zajęciach.</p>
+        <i>Eksport ZIP</i> pobiera cały projekt, a ikona <b>⤓</b> przy pliku w drzewie —
+        pojedynczy plik. Jedno i drugie można wkleić do CrossWorks na zajęciach.</p>
+
+      <h3>Własna grafika na wyświetlaczu</h3>
+      <p>Przycisk <b>🖼 Grafika → .h</b> otwiera konwerter: wrzucasz JPG/PNG, kadrujesz,
+        wybierasz rozdzielczość i dostajesz tablicę <code>const unsigned char</code>
+        w formacie 12&nbsp;bpp dla <code>LCDDrawBmp12()</code>. Konwerter pilnuje kolejności
+        składowych (sterownik ustawia <code>MADCTL = 0x08</code>, więc dane idą jako
+        <b>B-G-R</b> — stąd <code>RED&nbsp;0x00F</code> i <code>BLUE&nbsp;0xF00</code>);
+        gotowy plik można pobrać albo wysłać wprost do tego projektu.</p>
       <p class="dim">MCK = 48 MHz. Czas wirtualny płynie zgodnie z wybraną prędkością;
         pętle opóźniające (np. <code>Delaya()</code>) trwają tyle, co na prawdziwej płytce.</p>
     </div>

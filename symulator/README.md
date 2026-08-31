@@ -58,8 +58,59 @@ i otworzyć `http://localhost:8000`.
 
    Klawiatura działa, gdy kursor jest **poza** edytorem (kliknij w obszar płytki).
 5. Projekt zapisuje się automatycznie w przeglądarce (localStorage).
-   **Eksport ZIP** pobiera pliki — można je przenieść do CrossWorks na zajęciach.
+   **Eksport ZIP** pobiera cały projekt, a ikona **⤓** przy pliku w drzewie —
+   pojedynczy plik (z końcami linii CRLF, gotowy dla CrossWorks).
    **Import plików** dodaje pliki `.c`/`.h` z dysku (obsługuje kodowanie CP1250).
+
+## Konwerter grafiki → tablica C (`bmp.html`)
+
+Przycisk **🖼 Grafika → .h** na pasku narzędzi otwiera osobną podstronę, która
+zamienia zdjęcie **JPG/PNG** (a także GIF, BMP, WEBP) na tablicę
+`const unsigned char` w formacie **12 bpp** — takim, jakiego oczekuje
+`LCDDrawBmp12()` ze sterownika laboratoryjnego i jaki ma oryginalny
+`bmp.h` Olimeksa.
+
+Co można ustawić:
+
+* **rozdzielczość** — gotowe (132×132, 130×130, 80×80, ikony…) albo dowolna,
+* **kadrowanie** — interaktywny prostokąt na obrazie źródłowym (przeciąganie
+  i uchwyty), z opcjonalnym trzymaniem proporcji wyniku,
+* **dopasowanie** — *cover* (wypełnij i przytnij), *contain* (zmieść całość
+  i dopełnij tłem), *stretch* (rozciągnij, zmieniając proporcje),
+* **skalowanie** — gładkie (uśrednianie, do zdjęć) lub najbliższy piksel
+  (pixel-art, logo); obrót o 90/180/270° i odbicia,
+* **korekcja barw** — jasność, kontrast, nasycenie, gamma, negatyw, szarości,
+* **dithering** — Floyd–Steinberg lub Bayer 8×8; przy 12 bpp (16 poziomów na
+  składową) gradienty bez ditheringu wychodzą w pasy,
+* **tło pod przezroczystością** — kanał alfa z PNG jest komponowany z wybranym
+  kolorem,
+* **format** — 12 bpp pakowane (3 bajty / 2 piksele), 12 bpp jako
+  `unsigned short` (do `LCDSetPixel`) albo 16 bpp RGB565.
+
+### Kolejność składowych (zamiana czerwony ↔ niebieski)
+
+`LCDSettings()` z laboratorium ustawia `MADCTL (0x36) = 0x08`, czyli **bit BGR** —
+panel czyta pierwszą półbajtówkę jako **niebieski**, a ostatnią jako **czerwony**
+(stąd `RED 0x00F`, `GREEN 0x0F0`, `BLUE 0xF00` w `PCF8833U8_lcd.h`). Dlatego
+domyślnym układem konwertera jest **B-G-R** i kolory od razu wychodzą prawidłowo.
+
+Osobne pole *„wyświetlacz interpretuje dane jako”* pozwala sprawdzić, co się
+stanie po zmianie `MADCTL` we własnym kodzie: podgląd natychmiast pokazuje
+zamianę czerwonego z niebieskim, a pasek ostrzeżenia proponuje naprawę
+jednym kliknięciem.
+
+Przycisk **Podejrzyj .h** działa w drugą stronę — wkleja się do niego istniejącą
+tablicę (np. `bmp.h` z laboratorium), a konwerter zgaduje wymiary i pokazuje
+obraz przy obu interpretacjach kolorów. Przydatne, gdy obrazek na wyświetlaczu
+ma zamienione barwy.
+
+Wynik można **pobrać** jako `.h` (osobno lub wszystkie grafiki w jednym pliku),
+skopiować do schowka, zapisać podgląd jako PNG do sprawozdania albo wysłać
+przyciskiem **→ do symulatora** prosto do otwartego projektu.
+
+Konwerter pilnuje też rozmiaru: obraz 132×132 w 12 bpp to 26 136 bajtów, a
+konfiguracja *ARM RAM Release* mieści cały program w 64 KB SRAM — przy zbyt
+dużej tablicy pojawia się ostrzeżenie.
 
 ## Co jest symulowane
 
@@ -124,7 +175,8 @@ w symulator — definiuje rejestry w stylu CrossWorks (`PIOB_SODR`,
 ```
 symulator/
   index.html          — aplikacja (otwierana)
-  css/style.css
+  bmp.html            — konwerter grafiki na tablicę C (.h)
+  css/style.css, css/bmp.css
   js/
     cc_lex.js         — preprocesor + tokenizer C
     cc_parse.js       — parser C
@@ -135,6 +187,7 @@ symulator/
     board.js          — model płytki (wejścia, czas, buzzer)
     headers.js        — wirtualne nagłówki systemowe
     editor.js, ide.js — edytor i interfejs
+    bmpconv.js        — konwerter grafiki (kadr, skalowanie, kwantyzacja 12 bpp)
     projfiles.js      — wbudowane pliki projektu (generowany!)
   tools/
     build_projfiles.js — generuje projfiles.js (w tym bitmapy rysowane kodem)

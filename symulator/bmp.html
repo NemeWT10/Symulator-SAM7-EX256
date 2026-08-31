@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konwerter grafiki → tablica C (.h) — SAM7-EX256</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/bmp.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%232c7a44'/><rect x='3' y='3' width='10' height='10' rx='1' fill='%23ffd866'/></svg>">
+</head>
+<body class="bmp-page">
+
+<header id="toolbar">
+  <div class="brand">
+    <span class="brand-chip">SAM7-EX256</span>
+    <span class="brand-sub">grafika → tablica C (.h) dla LCD 132×132</span>
+  </div>
+  <div class="tb-group">
+    <button id="btnAdd" class="tb-btn tb-run" title="Wczytaj plik JPG / PNG / GIF / BMP / WEBP">＋ Dodaj grafikę</button>
+    <button id="btnLoadH" class="tb-btn" title="Wczytaj istniejącą tablicę .h i zobacz, jak wygląda">Podejrzyj .h</button>
+  </div>
+  <div class="tb-group tb-right">
+    <button id="btnHelpB" class="tb-btn" title="Pomoc — format danych, kolejność kolorów">?</button>
+    <a class="tb-btn tb-link" href="index.html" title="Powrót do symulatora">← Symulator</a>
+  </div>
+</header>
+
+<main id="bmpLayout">
+
+  <!-- ============ lista grafik ============ -->
+  <aside id="imgPane">
+    <div class="pane-head">
+      <span>GRAFIKI</span>
+      <span class="pane-actions"><button id="btnAdd2" title="Dodaj grafikę">＋</button></span>
+    </div>
+    <ul id="imgList"></ul>
+    <div class="pane-foot" id="imgInfo">brak grafik</div>
+  </aside>
+
+  <!-- ============ podglądy ============ -->
+  <section id="viewPane">
+    <div id="dropZone" class="drop-zone">
+      <div class="dz-inner">
+        <div class="dz-ico">🖼</div>
+        <div class="dz-t1">Przeciągnij tu plik <b>JPG</b> lub <b>PNG</b> (działa też GIF, BMP, WEBP)</div>
+        <div class="dz-t2">…albo kliknij <b>＋ Dodaj grafikę</b>. Wynikiem jest tablica
+          <code>const unsigned char</code> gotowa dla <code>LCDDrawBmp12()</code>.</div>
+      </div>
+    </div>
+
+    <div id="workArea" class="hidden">
+      <div class="view-row">
+        <!-- ŹRÓDŁO -->
+        <div class="view-box">
+          <div class="pane-head">
+            <span>ŹRÓDŁO — KADR</span>
+            <span class="vb-tools">
+              <button id="btnCropAll"  class="mini-btn" title="Kadr = cały obraz">cały</button>
+              <button id="btnCropFit"  class="mini-btn" title="Największy kadr o proporcjach wyniku">proporcje</button>
+              <button id="btnCropSq"   class="mini-btn" title="Kwadrat na środku">kwadrat</button>
+            </span>
+          </div>
+          <div id="srcWrap"><canvas id="srcCv"></canvas></div>
+          <div class="vb-foot" id="srcInfo"></div>
+        </div>
+
+        <!-- WYNIK -->
+        <div class="view-box">
+          <div class="pane-head">
+            <span>WYNIK — TAK ZOBACZY TO WYŚWIETLACZ</span>
+            <span class="vb-tools">
+              <label class="mini-lbl">powiększenie
+                <select id="selZoom">
+                  <option value="1">1×</option>
+                  <option value="2" selected>2×</option>
+                  <option value="3">3×</option>
+                  <option value="4">4×</option>
+                </select>
+              </label>
+              <label class="mini-lbl"><input type="checkbox" id="chkOnLcd"> na ekranie 132×132</label>
+            </span>
+          </div>
+          <div id="outWrap"><canvas id="outCv"></canvas></div>
+          <div class="vb-foot" id="outInfo"></div>
+        </div>
+      </div>
+
+      <div id="swapWarn" class="warn-bar hidden"></div>
+
+      <!-- KOD -->
+      <div class="view-box code-box">
+        <div class="pane-head">
+          <span>PLIK NAGŁÓWKOWY</span>
+          <span class="vb-tools">
+            <button id="btnCopy"    class="mini-btn">Kopiuj</button>
+            <button id="btnDlH"     class="mini-btn prim">⤓ Pobierz .h</button>
+            <button id="btnDlAll"   class="mini-btn" title="Wszystkie grafiki w jednym pliku .h">⤓ Wszystkie</button>
+            <button id="btnDlPng"   class="mini-btn" title="Podgląd wyniku jako PNG (do sprawozdania)">⤓ PNG</button>
+            <button id="btnToSim"   class="mini-btn" title="Dodaj plik .h do projektu w symulatorze">→ do symulatora</button>
+          </span>
+        </div>
+        <pre id="codeOut" class="code-out"></pre>
+        <div class="vb-foot" id="codeInfo"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ustawienia ============ -->
+  <aside id="cfgPane">
+    <div class="pane-head"><span>USTAWIENIA</span>
+      <span class="pane-actions"><button id="btnResetCfg" title="Przywróć ustawienia domyślne">⟲</button></span>
+    </div>
+    <div id="cfgScroll">
+
+      <fieldset class="cfg-sec">
+        <legend>Rozmiar i kadrowanie</legend>
+        <label class="row">Predefiniowane
+          <select id="selPreset">
+            <option value="132x132">132×132 — cały ekran</option>
+            <option value="130x130">130×130 — jak Olimex bmp.h</option>
+            <option value="128x128">128×128</option>
+            <option value="120x120">120×120 — jak bmpMikolaj</option>
+            <option value="116x121">116×121 — jak bmpChoinka</option>
+            <option value="80x80">80×80 — jak bmp80</option>
+            <option value="64x64">64×64</option>
+            <option value="48x48">48×48 — ikona</option>
+            <option value="32x32">32×32 — ikona</option>
+            <option value="custom">własny…</option>
+          </select>
+        </label>
+        <div class="row two">
+          <label>szerokość <input type="number" id="inW" min="1" max="512" value="132"></label>
+          <label>wysokość <input type="number" id="inH" min="1" max="512" value="132"></label>
+        </div>
+        <label class="row"><input type="checkbox" id="chkLockAsp" checked> kadr trzyma proporcje wyniku</label>
+        <label class="row">Dopasowanie
+          <select id="selFit">
+            <option value="cover">wypełnij i przytnij (cover)</option>
+            <option value="contain">zmieść całość + tło (contain)</option>
+            <option value="stretch">rozciągnij do W×H (zmiana proporcji)</option>
+          </select>
+        </label>
+        <label class="row">Skalowanie
+          <select id="selSmooth">
+            <option value="smooth">gładkie (uśrednianie — zdjęcia)</option>
+            <option value="pixel">najbliższy piksel (pixel-art, logo)</option>
+          </select>
+        </label>
+        <div class="row two">
+          <label>obrót
+            <select id="selRot"><option value="0">0°</option><option value="90">90°</option>
+              <option value="180">180°</option><option value="270">270°</option></select>
+          </label>
+          <label class="flips">odbicie
+            <span><input type="checkbox" id="chkFlipH"> ⇄</span>
+            <span><input type="checkbox" id="chkFlipV"> ⇅</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="cfg-sec">
+        <legend>Kolor i jakość</legend>
+        <label class="row rng">jasność <input type="range" id="rgBri" min="-100" max="100" value="0"><b id="vBri">0</b></label>
+        <label class="row rng">kontrast <input type="range" id="rgCon" min="-100" max="100" value="0"><b id="vCon">0</b></label>
+        <label class="row rng">nasycenie <input type="range" id="rgSat" min="0" max="200" value="100"><b id="vSat">100</b></label>
+        <label class="row rng">gamma <input type="range" id="rgGam" min="30" max="260" value="100"><b id="vGam">1.00</b></label>
+        <label class="row"><input type="checkbox" id="chkNeg"> negatyw</label>
+        <label class="row"><input type="checkbox" id="chkGray"> odcienie szarości</label>
+        <label class="row">Dithering (12 bpp = 4096 barw)
+          <select id="selDither">
+            <option value="none">brak — ostre krawędzie</option>
+            <option value="fs">Floyd–Steinberg — zdjęcia, gradienty</option>
+            <option value="bayer">uporządkowany 8×8 (Bayer)</option>
+          </select>
+        </label>
+        <label class="row">Tło pod przezroczystością
+          <span class="clr"><input type="color" id="inBg" value="#000000"><input type="text" id="inBgHex" value="#000000" spellcheck="false"></span>
+        </label>
+      </fieldset>
+
+      <fieldset class="cfg-sec">
+        <legend>Format danych</legend>
+        <label class="row">Układ tablicy
+          <select id="selFmt">
+            <option value="p12">12 bpp pakowane — 3 bajty / 2 piksele (LCDDrawBmp12)</option>
+            <option value="w12">12 bpp — słowa unsigned short (0xBGR)</option>
+            <option value="p16">16 bpp RGB565 pakowane (wymaga COLMOD 0x05)</option>
+          </select>
+        </label>
+        <label class="row">Kolejność składowych w tablicy
+          <select id="selOrder">
+            <option value="bgr">B-G-R — 0xBGR (sterownik z labu, MADCTL 0x08)</option>
+            <option value="rgb">R-G-B — 0xRGB (MADCTL bez bitu BGR)</option>
+          </select>
+        </label>
+        <label class="row">Wyświetlacz interpretuje dane jako
+          <select id="selPanel">
+            <option value="bgr">BGR — MADCTL = 0x08 (tak robi LCDSettings z labu)</option>
+            <option value="rgb">RGB — MADCTL = 0x00</option>
+          </select>
+        </label>
+        <div class="hintbox" id="orderHint"></div>
+      </fieldset>
+
+      <fieldset class="cfg-sec">
+        <legend>Plik wynikowy</legend>
+        <label class="row">nazwa tablicy <input type="text" id="inName" spellcheck="false"></label>
+        <label class="row">nazwa pliku <input type="text" id="inFile" spellcheck="false"></label>
+        <div class="row two">
+          <label>bajtów w wierszu <input type="number" id="inPerLine" min="4" max="64" value="24"></label>
+          <label>zapis
+            <select id="selCase"><option value="low">0xab</option><option value="up">0xAB</option></select>
+          </label>
+        </div>
+        <label class="row"><input type="checkbox" id="chkGuard" checked> strażnik #ifndef … #endif</label>
+        <label class="row"><input type="checkbox" id="chkDefs" checked> #define z szerokością i wysokością</label>
+        <label class="row"><input type="checkbox" id="chkUsage" checked> komentarz „jak użyć”</label>
+        <div class="row two">
+          <label>x0 — wiersz (PASET) <input type="number" id="inX0" min="0" max="131" value="0"></label>
+          <label>y0 — kolumna (CASET) <input type="number" id="inY0" min="0" max="131" value="0"></label>
+        </div>
+      </fieldset>
+
+    </div>
+  </aside>
+</main>
+
+<!-- ============ modal: podgląd .h ============ -->
+<div id="hModal" class="modal hidden">
+  <div class="modal-box wide">
+    <h2>Podgląd istniejącej tablicy .h</h2>
+    <div class="modal-body">
+      <p class="dim">Wklej zawartość pliku (albo wczytaj go z dysku) — zobaczysz, jak tablica wygląda
+        przy obu interpretacjach kolejności kolorów. Przydatne, gdy obrazek na wyświetlaczu ma
+        zamienione czerwony z niebieskim.</p>
+      <div class="row two">
+        <button id="btnHFile" class="tb-btn">Wczytaj plik .h</button>
+        <span class="dim" id="hParseInfo"></span>
+      </div>
+      <textarea id="hText" spellcheck="false" placeholder="const unsigned char bmp[] = { 0xff, 0xff, ... };"></textarea>
+      <div class="row three">
+        <label>tablica <select id="selHArr"></select></label>
+        <label>szerokość <input type="number" id="inHW" min="1" max="512" value="132"></label>
+        <label>wysokość <input type="number" id="inHH" min="1" max="512" value="132"></label>
+      </div>
+      <div class="row three">
+        <label>układ danych
+          <select id="selHFmt">
+            <option value="p12">12 bpp pakowane (3 B / 2 px)</option>
+            <option value="w12">12 bpp — słowa</option>
+            <option value="p16">16 bpp RGB565</option>
+          </select>
+        </label>
+        <span id="hSuggest" class="dim"></span>
+      </div>
+      <div class="hprev">
+        <figure><canvas id="hCvB"></canvas><figcaption>czytane jako <b>B-G-R</b> (MADCTL 0x08 — lab)</figcaption></figure>
+        <figure><canvas id="hCvR"></canvas><figcaption>czytane jako <b>R-G-B</b> (MADCTL 0x00)</figcaption></figure>
+      </div>
+    </div>
+    <button id="btnCloseH" class="tb-btn">Zamknij</button>
+  </div>
+</div>
+
+<!-- ============ modal: pomoc ============ -->
+<div id="helpModal2" class="modal hidden">
+  <div class="modal-box">
+    <h2>Konwerter grafiki — pomoc</h2>
+    <div class="modal-body">
+      <h3>Co powstaje</h3>
+      <p>Plik <code>.h</code> z tablicą <code>const unsigned char</code> w formacie <b>12 bitów na piksel</b>
+        (3 bajty na 2 piksele, bez wyrównywania wierszy) — dokładnie takim, jakiego oczekuje
+        <code>LCDDrawBmp12()</code> ze sterownika laboratoryjnego i jaki ma oryginalny
+        <code>bmp.h</code> firmy Olimex (130×130).</p>
+      <pre class="code-out small">// piksele P0, P1 (po 12 bitow) upakowane w 3 bajtach:
+// bajt0 = P0[11:4]
+// bajt1 = (P0[3:0] &lt;&lt; 4) | P1[11:8]
+// bajt2 = P1[7:0]</pre>
+
+      <h3>Dlaczego czerwony bywa zamieniony z niebieskim</h3>
+      <p>Kontroler PCF8833 ma w rejestrze <code>MADCTL</code> (0x36) bit <code>RGB/BGR</code>.
+        Sterownik z laboratorium wywołuje:</p>
+      <pre class="code-out small">WriteSpiCommand(ACCESSCTRL);   // 0x36
+WriteSpiData(0x08);            // bit 3 = BGR</pre>
+      <p>…więc panel czyta <b>pierwszą</b> półbajtówkę jako <b>niebieski</b>, a ostatnią jako <b>czerwony</b>.
+        Potwierdzają to stałe z <code>PCF8833U8_lcd.h</code>:
+        <code>RED&nbsp;0x00F</code>, <code>GREEN&nbsp;0x0F0</code>, <code>BLUE&nbsp;0xF00</code>.
+        Dlatego domyślną kolejnością w konwerterze jest <b>B-G-R</b> — przy takich ustawieniach
+        kolory wychodzą prawidłowo. Jeśli zmienisz <code>MADCTL</code> we własnym kodzie,
+        przestaw pole „wyświetlacz interpretuje dane jako”; podgląd od razu pokaże skutek.</p>
+
+      <h3>Układ współrzędnych</h3>
+      <p>W sterowniku Lyncha <code>x</code> to <b>wiersz</b> (PASET), a <code>y</code> to <b>kolumna</b> (CASET),
+        stąd <code>LCDDrawBmp12(tab, szerokosc, wysokosc, x0, y0)</code>, gdzie
+        <code>x0</code> odmierza się od góry, a <code>y0</code> od lewej.
+        Piksele w tablicy idą wierszami: od lewej do prawej, z góry na dół.</p>
+
+      <h3>Rozmiar a pamięć</h3>
+      <p>Konfiguracja <i>ARM RAM Release</i> ładuje cały program do 64 KB SRAM.
+        Obraz 132×132 w 12 bpp to <b>26 136 bajtów</b> — prawie połowa pamięci.
+        Konwerter ostrzega, gdy tablica robi się duża; przy kilku obrazach warto zejść z rozdzielczością.</p>
+
+      <h3>Dithering</h3>
+      <p>12 bpp to 16 poziomów na składową. Gładkie przejścia (niebo, cienie) wychodzą w pasy —
+        <i>Floyd–Steinberg</i> rozprasza błąd i wygląda dużo lepiej. Dla logo i pixel-artu
+        zostaw „brak”, żeby nie zaszumić płaskich powierzchni.</p>
+    </div>
+    <button id="btnCloseHelp2" class="tb-btn">Zamknij</button>
+  </div>
+</div>
+
+<script src="js/bmpconv.js"></script>
+</body>
+</html>
